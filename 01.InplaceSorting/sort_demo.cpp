@@ -1,15 +1,14 @@
-#include <iostream>
-#include <vector>
 #include <algorithm>
+#include <iostream>
+#include <numeric>
 #include <random>
-#include <iomanip>
+#include <vector>
 
 #include "collvalue.h"
 #include "sorting.h"
 
 using CollInt = CollectingValue<int>;
 
-// Random data
 std::vector<CollInt> generate_data(size_t n)
 {
     std::vector<CollInt> data(n);
@@ -20,6 +19,12 @@ std::vector<CollInt> generate_data(size_t n)
 void shuffle_data(std::vector<CollInt>& data)
 {
     std::shuffle(data.begin(), data.end(), std::mt19937{std::random_device{}()});
+}
+
+void print_stats(size_t n, const char* name)
+{
+    std::cout << n << "\t" << name << "\t\t" << CollInt::comps << "\t\t"
+              << CollInt::swaps << "\t\t" << CollInt::moves << "\n";
 }
 
 int main()
@@ -33,23 +38,20 @@ int main()
     {
         auto number_data = generate_data(n);
 
-        // --- Std Sort ---
         shuffle_data(number_data);
         CollInt::reset_stats();
         std::sort(number_data.begin(), number_data.end());
-        std::cout << n << "\tstd::sort\t" << CollInt::comps << "\t\t" << CollInt::swaps << "\t\t" << CollInt::moves << "\n";
+        print_stats(n, "std::sort");
 
-        // --- Bubble Sort ---
         shuffle_data(number_data);
         CollInt::reset_stats();
         bubble_sort(number_data.begin(), number_data.end());
-        std::cout << n << "\tBubble\t\t" << CollInt::comps << "\t\t" << CollInt::swaps << "\t\t" << CollInt::moves << "\n";
+        print_stats(n, "Bubble");
 
-        // --- Insertion Sort ---
         shuffle_data(number_data);
         CollInt::reset_stats();
-        quick_sort(number_data.begin(), number_data.end());
-        std::cout << n << "\tInsertion\t" << CollInt::comps << "\t\t" << CollInt::swaps << "\t\t" << CollInt::moves << "\n";
+        heap_sort(number_data.begin(), number_data.end());
+        print_stats(n, "Heap");
 
         std::cout << "--------------------------------------------------------------\n";
     }
