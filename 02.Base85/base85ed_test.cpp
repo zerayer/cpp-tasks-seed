@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,13 +33,13 @@ static Bytes make_random_bytes(std::size_t size)
 
 TEST(Base85ShortsEncode, TrivialShortEncodes)
 {
-    std::vector<std::pair<std::string, std::string>> cases = {
-        {"", ""},
-        {"F#", "1"},
-        {"F){", "12"},
-        {"F)}j", "123"},
-        {"F)}kW", "1234"},
-    };
+    std::vector<std::pair<std::string, std::string>> cases;
+
+    cases.push_back(std::make_pair("", ""));
+    cases.push_back(std::make_pair("F#", "1"));
+    cases.push_back(std::make_pair("F){", "12"));
+    cases.push_back(std::make_pair("F)}j", "123"));
+    cases.push_back(std::make_pair("F)}kW", "1234"));
 
     for (auto const& item : cases)
     {
@@ -48,13 +49,13 @@ TEST(Base85ShortsEncode, TrivialShortEncodes)
 
 TEST(Base85ShortsDecode, TrivialShortDecodes)
 {
-    std::vector<std::pair<std::string, std::string>> cases = {
-        {"", ""},
-        {"F#", "1"},
-        {"F){", "12"},
-        {"F)}j", "123"},
-        {"F)}kW", "1234"},
-    };
+    std::vector<std::pair<std::string, std::string>> cases;
+
+    cases.push_back(std::make_pair("", ""));
+    cases.push_back(std::make_pair("F#", "1"));
+    cases.push_back(std::make_pair("F){", "12"));
+    cases.push_back(std::make_pair("F)}j", "123"));
+    cases.push_back(std::make_pair("F)}kW", "1234"));
 
     for (auto const& item : cases)
     {
@@ -64,7 +65,18 @@ TEST(Base85ShortsDecode, TrivialShortDecodes)
 
 TEST(Base85RoundTrip, DifferentSizes)
 {
-    std::vector<std::size_t> sizes = {0, 1, 2, 3, 4, 5, 10, 100, 1000, 4096};
+    std::vector<std::size_t> sizes;
+
+    sizes.push_back(0);
+    sizes.push_back(1);
+    sizes.push_back(2);
+    sizes.push_back(3);
+    sizes.push_back(4);
+    sizes.push_back(5);
+    sizes.push_back(10);
+    sizes.push_back(100);
+    sizes.push_back(1000);
+    sizes.push_back(4096);
 
     for (std::size_t size : sizes)
     {
