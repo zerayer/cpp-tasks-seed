@@ -1,117 +1,137 @@
-#include <vector>
+#include <algorithm>
+#include <array>
 #include <cstdint>
-#include <string>
+#include <limits>
 #include <stdexcept>
-#include <cstring>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <errno.h>
+#include <vector>
 
 #include "base85ed.h"
 
-// TODO: remove this
-static std::vector<uint8_t> run_command_io(const std::string &command,
-        const std::vector<uint8_t> &in)
+namespace
 {
-    int inpipe[2];   // parent -> child
-    int outpipe[2];  // child -> parent
 
-    if (pipe(inpipe) == -1) throw std::runtime_error(strerror(errno));
-    if (pipe(outpipe) == -1)
+constexpr std::uint32_t BYTE_BASE = 256;
+constexpr std::uint32_t BASE85 = 85;
+constexpr std::uint8_t INVALID_VALUE = 255;
+
+constexpr char ALPHABET[] =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
+
+std::array<std::uint8_t, BYTE_BASE> make_reverse_table()
+{
+    std::array<std::uint8_t, BYTE_BASE> table{};
+    table.fill(INVALID_VALUE);
+
+    for (std::uint8_t i = 0; i < BASE85; ++i)
     {
-        close(inpipe[0]);
-        close(inpipe[1]);
-        throw std::runtime_error(strerror(errno));
+        table[static_cast<std::uint8_t>(ALPHABET[i])] = i;
     }
 
-    pid_t pid = fork();
-    if (pid == -1)
-    {
-        close(inpipe[0]);
-        close(inpipe[1]);
-        close(outpipe[0]);
-        close(outpipe[1]);
-        throw std::runtime_error(strerror(errno));
-    }
-
-    if (pid == 0)
-    {
-        // child
-        dup2(inpipe[0], STDIN_FILENO);
-        dup2(outpipe[1], STDOUT_FILENO);
-        close(inpipe[0]);
-        close(inpipe[1]);
-        close(outpipe[0]);
-        close(outpipe[1]);
-        execl("/bin/sh", "sh", "-c", command.c_str(), (char*)nullptr);
-        _exit(127);
-    }
-
-    // parent
-    close(inpipe[0]);
-    close(outpipe[1]);
-
-    // write input
-    const uint8_t *wp = in.data();
-    ssize_t remaining = static_cast<ssize_t>(in.size());
-    while (remaining > 0)
-    {
-        ssize_t n = write(inpipe[1], wp, remaining);
-        if (n == -1)
-        {
-            if (errno == EINTR) continue;
-            close(inpipe[1]);
-            close(outpipe[0]);
-            waitpid(pid, nullptr, 0);
-            throw std::runtime_error(strerror(errno));
-        }
-        remaining -= n;
-        wp += n;
-    }
-    close(inpipe[1]); // signal EOF
-
-    // read all stdout
-    std::vector<uint8_t> out;
-    uint8_t buf[4096];
-    while (true)
-    {
-        ssize_t n = read(outpipe[0], buf, sizeof(buf));
-        if (n > 0) out.insert(out.end(), buf, buf + n);
-        else if (n == 0) break;
-        else
-        {
-            if (errno == EINTR) continue;
-            close(outpipe[0]);
-            waitpid(pid, nullptr, 0);
-            throw std::runtime_error(strerror(errno));
-        }
-    }
-    close(outpipe[0]);
-
-    int status = 0;
-    if (waitpid(pid, &status, 0) == -1) throw std::runtime_error(strerror(errno));
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        throw std::runtime_error("child exited with non-zero status");
-
-    return out;
+    return table;
 }
 
+std::array<std::uint8_t, BYTE_BASE> const REVERSE_TABLE = make_reverse_table();
 
-// TODO: implement this in C++
-std::vector<uint8_t> base85::encode(std::vector<uint8_t> const &bytes)
+} // namespace
+
+std::vector<std::uint8_t> base85::encode(std::vector<std::uint8_t> const& bytes)
 {
-    return run_command_io(
-               "/usr/bin/env -S python3 -c 'import sys; import base64; sys.stdout.buffer.write(base64.b85encode(sys.stdin.buffer.read()))'",
-               bytes
-           );
+    std::vector<std::uint8_t> result;
+
+    if (bytes.empty())
+    {
+        return result;
+    }
+
+    result.reserve((bytes.size() + 3) / 4 * 5);
+
+    for (std::size_t i = 0; i < bytes.size(); i += 4)
+    {
+        std::uint32_t value = 0;
+        std::size_t chunk_size = std::min<std::size_t>(4, bytes.size() - i);
+
+        for (std::size_t j = 0; j < chunk_size; ++j)
+        {
+            value = value * BYTE_BASE + bytes[i + j];
+        }
+
+        for (std::size_t j = chunk_size; j < 4; ++j)
+        {
+            value *= BYTE_BASE;
+        }
+
+        std::array<std::uint8_t, 5> encoded{};
+
+        for (int j = 4; j >= 0; --j)
+        {
+            encoded[static_cast<std::size_t>(j)] =
+                static_cast<std::uint8_t>(ALPHABET[value % BASE85]);
+            value /= BASE85;
+        }
+
+        std::size_t output_size = chunk_size + 1;
+        result.insert(result.end(), encoded.begin(), encoded.begin() + output_size);
+    }
+
+    return result;
 }
 
-
-// TODO: implement this in C++
-std::vector<uint8_t> base85::decode(std::vector<uint8_t> const &b85str)
+std::vector<std::uint8_t> base85::decode(std::vector<std::uint8_t> const& b85str)
 {
-    return run_command_io(
-               "/usr/bin/env -S python3 -c 'import sys; import base64; sys.stdout.buffer.write(base64.b85decode(sys.stdin.buffer.read()))'",
-               b85str
-           );
+    std::vector<std::uint8_t> result;
+
+    if (b85str.empty())
+    {
+        return result;
+    }
+
+    result.reserve(b85str.size() / 5 * 4);
+
+    for (std::size_t i = 0; i < b85str.size(); i += 5)
+    {
+        std::size_t chunk_size = std::min<std::size_t>(5, b85str.size() - i);
+        std::array<std::uint8_t, 5> block{};
+
+        for (std::size_t j = 0; j < chunk_size; ++j)
+        {
+            std::uint8_t symbol = b85str[i + j];
+
+            if (REVERSE_TABLE[symbol] == INVALID_VALUE)
+            {
+                throw std::runtime_error("invalid Base85 character");
+            }
+
+            block[j] = symbol;
+        }
+
+        for (std::size_t j = chunk_size; j < 5; ++j)
+        {
+            block[j] = static_cast<std::uint8_t>(ALPHABET[84]);
+        }
+
+        std::uint64_t value = 0;
+
+        for (std::size_t j = 0; j < 5; ++j)
+        {
+            value = value * BASE85 + REVERSE_TABLE[block[j]];
+        }
+
+        if (value > std::numeric_limits<std::uint32_t>::max())
+        {
+            throw std::runtime_error("invalid Base85 block");
+        }
+
+        std::array<std::uint8_t, 4> decoded{};
+
+        for (int j = 3; j >= 0; --j)
+        {
+            decoded[static_cast<std::size_t>(j)] = static_cast<std::uint8_t>(value % BYTE_BASE);
+            value /= BYTE_BASE;
+        }
+
+        std::size_t output_size = chunk_size - 1;
+        result.insert(result.end(), decoded.begin(), decoded.begin() + output_size);
+    }
+
+    return result;
 }
