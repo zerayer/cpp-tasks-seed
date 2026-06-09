@@ -1,6 +1,8 @@
 #ifndef SORTING_H
 #define SORTING_H
 
+#include <utility>
+
 #include "collvalue.h"
 
 template <typename Iterator>
@@ -19,6 +21,7 @@ void bubble_sort(Iterator begin, Iterator end)
         {
             if (*(j + 1) < *j)
             {
+                using std::swap;
                 swap(*j, *(j + 1));
                 swapped = true;
             }
@@ -55,7 +58,9 @@ void sift_down(Iterator begin, int size, int index)
             break;
         }
 
+        using std::swap;
         swap(*(begin + index), *(begin + largest));
+
         index = largest;
     }
 }
@@ -72,7 +77,9 @@ void heap_sort(Iterator begin, Iterator end)
 
     for (int i = size - 1; i > 0; --i)
     {
+        using std::swap;
         swap(*begin, *(begin + i));
+
         sift_down(begin, i, 0);
     }
 }
