@@ -5,76 +5,105 @@
 
 #include "Gauss_solve.h"
 
-TEST(GaussSolve, Small2x2)
+TEST(GaussSolve, TwoByTwo)
 {
     GaussMatrix ab(2, 3);
-    ab << 2, 1, 5,
-          1, 3, 7;
 
-    GaussVector x = Gauss_solve(ab);
+    ab(0, 0) = 2.0;
+    ab(0, 1) = 1.0;
+    ab(0, 2) = 5.0;
+    ab(1, 0) = 1.0;
+    ab(1, 1) = 3.0;
+    ab(1, 2) = 7.0;
 
-    EXPECT_NEAR(x(0), 1.6, 1e-9);
-    EXPECT_NEAR(x(1), 1.8, 1e-9);
+    GaussVector result = Gauss_solve(ab);
+
+    EXPECT_NEAR(result(0), 1.6, 0.000000001);
+    EXPECT_NEAR(result(1), 1.8, 0.000000001);
 }
 
-TEST(GaussSolve, Classic3x3)
+TEST(GaussSolve, ThreeByThree)
 {
     GaussMatrix ab(3, 4);
-    ab << 2, 1, -1, 8,
-          -3, -1, 2, -11,
-          -2, 1, 2, -3;
 
-    GaussVector x = Gauss_solve(ab);
+    ab(0, 0) = 2.0;
+    ab(0, 1) = 1.0;
+    ab(0, 2) = -1.0;
+    ab(0, 3) = 8.0;
 
-    EXPECT_NEAR(x(0), 2.0, 1e-9);
-    EXPECT_NEAR(x(1), 3.0, 1e-9);
-    EXPECT_NEAR(x(2), -1.0, 1e-9);
+    ab(1, 0) = -3.0;
+    ab(1, 1) = -1.0;
+    ab(1, 2) = 2.0;
+    ab(1, 3) = -11.0;
+
+    ab(2, 0) = -2.0;
+    ab(2, 1) = 1.0;
+    ab(2, 2) = 2.0;
+    ab(2, 3) = -3.0;
+
+    GaussVector result = Gauss_solve(ab);
+
+    EXPECT_NEAR(result(0), 2.0, 0.000000001);
+    EXPECT_NEAR(result(1), 3.0, 0.000000001);
+    EXPECT_NEAR(result(2), -1.0, 0.000000001);
 }
 
-TEST(GaussSolve, SingularMatrixThrows)
+TEST(GaussSolve, SingularMatrix)
 {
     GaussMatrix ab(2, 3);
-    ab << 1, 2, 3,
-          2, 4, 6;
+
+    ab(0, 0) = 1.0;
+    ab(0, 1) = 2.0;
+    ab(0, 2) = 3.0;
+    ab(1, 0) = 2.0;
+    ab(1, 1) = 4.0;
+    ab(1, 2) = 6.0;
 
     EXPECT_THROW(Gauss_solve(ab), std::runtime_error);
 }
 
-TEST(GaussSolve, GeneratedLargeSystem)
+TEST(GaussSolve, GeneratedSystem)
 {
-    const int n = 30;
+    const int size = 30;
 
     std::mt19937 generator(42);
-    std::uniform_real_distribution<double> distribution(-10.0, 10.0);
+    std::uniform_int_distribution<int> distribution(-10, 10);
 
-    GaussMatrix a(n, n);
-    GaussVector expected(n);
+    GaussMatrix matrix(size, size);
+    GaussVector expected(size);
 
-    for (int row = 0; row < n; ++row)
+    for (int row = 0; row < size; ++row)
     {
         expected(row) = distribution(generator);
 
-        for (int col = 0; col < n; ++col)
+        for (int column = 0; column < size; ++column)
         {
-            a(row, col) = distribution(generator);
+            matrix(row, column) = distribution(generator);
         }
     }
 
-    for (int row = 0; row < n; ++row)
+    for (int row = 0; row < size; ++row)
     {
-        a(row, row) += 100.0;
+        matrix(row, row) += 100.0;
     }
 
-    GaussVector b = a * expected;
-    GaussMatrix ab(n, n + 1);
+    GaussVector right_part = matrix * expected;
+    GaussMatrix augmented(size, size + 1);
 
-    ab.block(0, 0, n, n) = a;
-    ab.col(n) = b;
-
-    GaussVector actual = Gauss_solve(ab);
-
-    for (int row = 0; row < n; ++row)
+    for (int row = 0; row < size; ++row)
     {
-        EXPECT_NEAR(actual(row), expected(row), 1e-7);
+        for (int column = 0; column < size; ++column)
+        {
+            augmented(row, column) = matrix(row, column);
+        }
+
+        augmented(row, size) = right_part(row);
+    }
+
+    GaussVector result = Gauss_solve(augmented);
+
+    for (int row = 0; row < size; ++row)
+    {
+        EXPECT_NEAR(result(row), expected(row), 0.000001);
     }
 }
