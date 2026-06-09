@@ -42,7 +42,7 @@ TEST(GaussSolve, SingularMatrixThrows)
 
 TEST(GaussSolve, GeneratedLargeSystem)
 {
-    constexpr int n = 30;
+    const int n = 30;
 
     std::mt19937 generator(42);
     std::uniform_real_distribution<double> distribution(-10.0, 10.0);
@@ -50,19 +50,19 @@ TEST(GaussSolve, GeneratedLargeSystem)
     GaussMatrix a(n, n);
     GaussVector expected(n);
 
-    for (int i = 0; i < n; ++i)
+    for (int row = 0; row < n; ++row)
     {
-        expected(i) = distribution(generator);
+        expected(row) = distribution(generator);
 
-        for (int j = 0; j < n; ++j)
+        for (int col = 0; col < n; ++col)
         {
-            a(i, j) = distribution(generator);
+            a(row, col) = distribution(generator);
         }
     }
 
-    for (int i = 0; i < n; ++i)
+    for (int row = 0; row < n; ++row)
     {
-        a(i, i) += 100.0;
+        a(row, row) += 100.0;
     }
 
     GaussVector b = a * expected;
@@ -73,8 +73,8 @@ TEST(GaussSolve, GeneratedLargeSystem)
 
     GaussVector actual = Gauss_solve(ab);
 
-    for (int i = 0; i < n; ++i)
+    for (int row = 0; row < n; ++row)
     {
-        EXPECT_NEAR(actual(i), expected(i), 1e-7);
+        EXPECT_NEAR(actual(row), expected(row), 1e-7);
     }
 }
